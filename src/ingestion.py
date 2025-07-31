@@ -7,7 +7,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 
 
-def_load_documents_from_book(book_dir_path: Path) -> list[Document]:
+def _load_documents_from_book(book_dir_path: Path) -> list[Document]:
     """
     Loads a book's markdown and metadata, splits it into chunks,
     and enriches each chunk with metadata.
