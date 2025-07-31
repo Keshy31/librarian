@@ -1,6 +1,6 @@
 from langchain.schema import Document
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 def create_and_persist_store(
     chunks: list[Document], 
@@ -15,7 +15,7 @@ def create_and_persist_store(
         embedding_model_name: The name of the Hugging Face model to use for embeddings.
         persist_directory: The directory to persist the vector store to.
     """
-    print("Initializing embeddings model...")
+    print("Initializing embeddings model... (This may take a moment for the first run as the model is downloaded)")
     embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
 
     print(f"Creating and persisting vector store at '{persist_directory}'...")
@@ -24,5 +24,4 @@ def create_and_persist_store(
         embedding=embeddings,
         persist_directory=persist_directory
     )
-    vectorstore.persist()
-    print("Vector store created and persisted successfully.")
+    print("Vector store created successfully.")

@@ -4,6 +4,7 @@ sentence-transformers
 chromadb
 langchain_ollama
 streamlit
+langchain-huggingface
 unstructured
 markdown
 python-magic-bin
