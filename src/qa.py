@@ -1,26 +1,38 @@
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.llms import Ollama
-from langchain.chains import RetrievalQA
+from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
 
 # Configuration
 VECTOR_DB_PATH = "db"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL = "gemma3:4b"
 
-PROMPT_TEMPLATE = """
-Use the following context to answer the question. Your answer should be grounded in the text provided.
+# This prompt formats each individual document.
+DOCUMENT_PROMPT_TEMPLATE = """
+---
+Source: {book_title}, Chapter: {chapter}, Page: {page}
 
-Include citations with the book title, chapter, and page number at the end of each relevant sentence or paragraph.
+Content:
+{page_content}
+---
+"""
+
+# This prompt combines the documents and the question.
+PROMPT_TEMPLATE = """
+Use the following context to answer the question. Your answer must be grounded in the text provided.
+
+Include a citation for each piece of information you use, with the book title, chapter, and page number.
 For example: The author argues for a focus on fundamentals (The Art of Doing Science and Engineering, Chapter 5, Page 23).
 
-If you are asked to retrieve a direct quote, provide it and its citation.
 If the context does not contain the answer, state that you cannot answer the question based on the provided text.
 
-Context: {context}
+Context:
+{context}
 
-Question: {question}
+Question: {input}
 
 Answer:
 """
@@ -36,20 +48,23 @@ class QAChain:
             embedding_function=embeddings
         )
         
-        llm = Ollama(model=LLM_MODEL)
+        llm = OllamaLLM(model=LLM_MODEL)
         
-        prompt = PromptTemplate(
-            template=PROMPT_TEMPLATE, 
-            input_variables=["context", "question"]
-        )
+        # Create a prompt for formatting each document
+        document_prompt = PromptTemplate.from_template(DOCUMENT_PROMPT_TEMPLATE)
+
+        # Create a prompt for the final question-answering
+        qa_prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
         
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
+        # Create a chain that stuffs the formatted documents into the final prompt
+        stuff_chain = create_stuff_documents_chain(llm, qa_prompt, document_prompt=document_prompt)
+        
+        # Create the retrieval chain
+        self.retrieval_chain = create_retrieval_chain(
             retriever=vector_store.as_retriever(search_kwargs={"k": 5}),
-            chain_type_kwargs={"prompt": prompt},
-            return_source_documents=True
+            combine_docs_chain=stuff_chain
         )
+
         print("QA Chain initialized successfully.")
 
     def ask(self, query: str) -> dict:
@@ -60,10 +75,10 @@ class QAChain:
             query: The question to ask.
 
         Returns:
-            A dictionary containing the query, result, and source documents.
+            A dictionary containing the query, answer, and source documents.
         """
         print(f"Received query: {query}")
-        result = self.qa_chain.invoke({"query": query})
+        result = self.retrieval_chain.invoke({"input": query})
         return result
 
 if __name__ == '__main__':
@@ -78,8 +93,7 @@ if __name__ == '__main__':
     response = qa_system.ask(example_query)
     
     print("\n--- Response ---")
-    print(response.get('result'))
-    print("\n--- Source Documents ---")
-    for doc in response.get('source_documents', []):
+    print(response.get('answer'))
+    print("\n--- Source Documents (Context) ---")
+    for doc in response.get('context', []):
         print(f"- Source: {doc.metadata.get('source')}, Page: {doc.metadata.get('page')}")
-        # print(f"  Content: {doc.page_content[:100]}...") # Uncomment to see content
