@@ -5,3 +5,5 @@ chromadb
 langchain_ollama
 streamlit
 unstructured
+markdown
+python-magic-bin

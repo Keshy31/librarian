@@ -1,4 +1,4 @@
 /books
 /chroma_db
 /venv
-__pycache__
+/src/__pycache__
