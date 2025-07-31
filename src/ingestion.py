@@ -2,9 +2,11 @@ import json
 import re
 import os
 from pathlib import Path
-from langchain.document_loaders import UnstructuredMarkdownLoader
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 def _load_documents_from_book(book_dir_path: Path) -> list[Document]:
@@ -52,12 +54,16 @@ def _load_documents_from_book(book_dir_path: Path) -> list[Document]:
             # Update chapter if a new page is found in our map
             current_chapter = page_to_chapter.get(current_page, current_chapter)
         
+        meta_info = metadata.get('meta', {})
         chunk.metadata = {
-            "book_title": metadata.get('meta', {}).get('title'),
-            "author": metadata.get('meta', {}).get('authorList', [None])[0],
+            "book_title": meta_info.get('title'),
+            "author": meta_info.get('authorList', [None])[0],
+            "publisher": meta_info.get('publisher'),
+            "release_date": meta_info.get('releaseDate'),
+            "asin": meta_info.get('asin'),
             "chapter": current_chapter,
             "page": current_page,
-            "source": str(book_path.relative_to(Path.cwd()))
+            "source": str(book_path)
         }
 
     return chunks
@@ -83,14 +89,45 @@ def load_all_books(books_base_dir: str = "books") -> list[Document]:
     
     return all_chunks
 
+def embed_and_store(
+    chunks: list[Document], 
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    persist_directory: str = "db"
+):
+    """
+    Embeds document chunks and stores them in a Chroma vector store.
+
+    Args:
+        chunks: A list of Document objects to embed and store.
+        embedding_model_name: The name of the Hugging Face model to use for embeddings.
+        persist_directory: The directory to persist the vector store to.
+    """
+    print("Initializing embeddings model...")
+    embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
+
+    print(f"Creating and persisting vector store at '{persist_directory}'...")
+    vectorstore = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        persist_directory=persist_directory
+    )
+    vectorstore.persist()
+    print("Vector store created and persisted successfully.")
+
+
 if __name__ == '__main__':
     # Example of how to run the ingestion
     print("Starting book ingestion...")
     documents = load_all_books()
-    print(f"Ingested a total of {len(documents)} document chunks.")
+    
     if documents:
+        print(f"Loaded a total of {len(documents)} document chunks.")
+        embed_and_store(documents)
         print("\n--- Sample Chunk ---")
         print(documents[0].page_content)
         print("\n--- Metadata ---")
         print(documents[0].metadata)
-        print("--------------------\n")
+        print("--------------------")
+        print("\nIngestion and embedding complete.")
+    else:
+        print("No documents were loaded. Aborting.")
