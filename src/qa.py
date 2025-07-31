@@ -43,7 +43,7 @@ class QAChain:
         embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
         
         print(f"Loading vector store from '{VECTOR_DB_PATH}'...")
-        vector_store = Chroma(
+        self.vector_store = Chroma(
             persist_directory=VECTOR_DB_PATH, 
             embedding_function=embeddings
         )
@@ -61,24 +61,63 @@ class QAChain:
         
         # Create the retrieval chain
         self.retrieval_chain = create_retrieval_chain(
-            retriever=vector_store.as_retriever(search_kwargs={"k": 5}),
+            retriever=self.vector_store.as_retriever(search_kwargs={"k": 5}),
             combine_docs_chain=stuff_chain
         )
 
         print("QA Chain initialized successfully.")
 
-    def ask(self, query: str) -> dict:
+    def get_available_books(self) -> list[str]:
+        """
+        Gets a list of available book titles from the vector store.
+
+        Returns:
+            A sorted list of unique book titles.
+        """
+        # The .get() method without IDs or where filter fetches all documents
+        all_docs = self.vector_store.get()
+        all_metadata = all_docs.get('metadatas', [])
+        
+        book_titles = {meta['book_title'] for meta in all_metadata if 'book_title' in meta}
+        
+        return sorted(list(book_titles))
+
+    def ask(self, query: str, book_title: str | None = None) -> dict:
         """
         Asks a question to the QA chain.
 
         Args:
             query: The question to ask.
+            book_title: If provided, filters the search to a specific book.
 
         Returns:
             A dictionary containing the query, answer, and source documents.
         """
         print(f"Received query: {query}")
-        result = self.retrieval_chain.invoke({"input": query})
+        
+        search_kwargs = {"k": 5}
+        if book_title:
+            print(f"Filtering by book: {book_title}")
+            search_kwargs['filter'] = {'book_title': book_title}
+            
+        retriever = self.vector_store.as_retriever(
+            search_kwargs=search_kwargs
+        )
+        
+        # We need to recreate the retrieval chain with the potentially updated retriever
+        # This is a bit inefficient, but necessary with the current structure.
+        # A more advanced implementation might cache chains per book.
+        llm = OllamaLLM(model=LLM_MODEL)
+        document_prompt = PromptTemplate.from_template(DOCUMENT_PROMPT_TEMPLATE)
+        qa_prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
+        stuff_chain = create_stuff_documents_chain(llm, qa_prompt, document_prompt=document_prompt)
+        
+        retrieval_chain = create_retrieval_chain(
+            retriever=retriever,
+            combine_docs_chain=stuff_chain
+        )
+        
+        result = retrieval_chain.invoke({"input": query})
         return result
 
 if __name__ == '__main__':
