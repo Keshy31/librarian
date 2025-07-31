@@ -5,6 +5,7 @@ chromadb
 langchain_ollama
 streamlit
 langchain-huggingface
+langchain-chroma
 unstructured
 markdown
 python-magic-bin
