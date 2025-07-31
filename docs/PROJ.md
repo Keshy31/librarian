@@ -1,23 +1,28 @@
 # Project Overview: Ebook RAG System with LangChain
 
 ## Introduction
+
 This project implements a Retrieval-Augmented Generation (RAG) system using LangChain to enable interactive querying of ebooks stored as markdown files. The system ingests ebook content, embeds it for semantic search, stores it in a vector database, and provides a chat interface for users to ask questions, retrieve specific paragraphs, or summarize concepts. It leverages metadata from JSON files to enrich queries with chapter and page references.
 
 The initial prototype focuses on simplicity and local execution, supporting a small library (starting with 2 test ebooks). It's designed for scalability, with potential extensions for larger libraries or image integration. The core goal is to "chat with books," e.g., "Summarize Hamming's views on style in chapter 1" or "Retrieve paragraphs on education vs. training from page 3."
 
 ## Key Architecture Components
+
 The system follows a standard RAG pipeline:
+
 1. **Ingestion**: Load markdown files, split into chunks, and add metadata (e.g., book title, chapter, page).
 2. **Embedding & Storage**: Convert chunks to vectors and store in a local vector database.
 3. **Querying**: Use semantic search to retrieve relevant chunks, then generate responses via a local LLM.
 4. **User Interface**: A web-based chat UI for natural language queries.
 
 High-level flow:
+
 - User inputs a query via the UI.
 - System retrieves top relevant chunks (e.g., 5) based on similarity.
 - LLM generates a grounded response, including citations (e.g., chapter/page).
 
 ## Tech Stack
+
 - **Framework**: LangChain (for loaders, splitters, embeddings, vector stores, and chains).
 - **Document Loading**: `UnstructuredMarkdownLoader` for markdown files.
 - **Text Splitting**: `RecursiveCharacterTextSplitter` (chunk size ~1000 chars, overlap 200).
@@ -33,6 +38,7 @@ All components are local and offline to ensure privacy and zero cost. No externa
 ## Implementation Details
 
 ### 1. Data Ingestion
+
 - **Input**: Markdown files (one per ebook) and corresponding metadata JSON (e.g., TOC, pages).
 - **Process**:
   - Parse JSON to map pages to chapters.
@@ -40,6 +46,7 @@ All components are local and offline to ensure privacy and zero cost. No externa
   - Split into chunks using `RecursiveCharacterTextSplitter` to preserve structure (e.g., paragraphs, headers).
   - Enrich each chunk with metadata: book title, author, chapter, page (extracted via regex for [Page X] markers).
 - **Example Code Snippet**:
+
   ```python
   import json
   import re
@@ -80,9 +87,11 @@ All components are local and offline to ensure privacy and zero cost. No externa
   ```
 
 ### 2. Embedding and Storage
+
 - **Process**: Embed chunks using the Hugging Face model and store in Chroma.
 - **Benefits**: Supports metadata filtering (e.g., query only specific chapters).
 - **Example Code Snippet**:
+
   ```python
   from langchain.embeddings import HuggingFaceEmbeddings
   from langchain.vectorstores import Chroma
@@ -97,9 +106,11 @@ All components are local and offline to ensure privacy and zero cost. No externa
   ```
 
 ### 3. Querying and Response Generation
+
 - **Process**: Use a RetrievalQA chain to fetch chunks and generate responses.
 - **Custom Prompt**: Ensures responses include citations and handle summarization/retrieval.
 - **Example Code Snippet**:
+
   ```python
   from langchain_ollama import OllamaLLM
   from langchain.chains import RetrievalQA
@@ -125,6 +136,7 @@ All components are local and offline to ensure privacy and zero cost. No externa
   ```
 
 ### 4. Streamlit User Interface
+
 - **Description**: A simple web-based chat interface for querying the system. Users type questions, and responses appear in a conversation history. Includes a sidebar for instructions or future filters (e.g., book selection).
 - **Features**:
   - Real-time chat simulation.
@@ -132,6 +144,7 @@ All components are local and offline to ensure privacy and zero cost. No externa
   - Session state for conversation history.
 - **Running**: `streamlit run app.py` (separate file).
 - **Example Code Snippet** (in `app.py`):
+
   ```python
   import streamlit as st
   from langchain_ollama import OllamaLLM
@@ -182,12 +195,14 @@ All components are local and offline to ensure privacy and zero cost. No externa
   ```
 
 ## Deployment and Usage
+
 - **Setup**: Install dependencies, run Ollama (`ollama run mistral`), ingest data once (via script), then launch Streamlit.
 - **Testing**: Use sample queries on test ebooks. Expected latency: <5s per query on standard hardware.
 - **Multi-Book Support**: Ingest multiple markdown/JSON pairs; use Chroma collections for separation.
 - **Limitations**: Local-only; no real-time updates. For production, consider containerization (e.g., Docker).
 
 ## Next Steps
+
 - Test with full ebooks and refine chunking/metadata.
 - Add filters in UI (e.g., dropdown for books/chapters).
 - Monitor performance; optimize embeddings if needed.
